@@ -1,0 +1,4 @@
+game_id, venue, sweater_number, game_period, shift_start_time, new_shift_start_time, shift_end_time, new_shift_end_time, duration, new_duration
+2020020016, "home", 9, 2, 2111, 2161, 2225, 2225, 114, 64
+2020020016, "home", 11, 2, 2069, 2069, 2225, 2111, 156, 42
+2020020016, "home", 23, 2, 2072, 2072, 2225, 2111, 153, 39

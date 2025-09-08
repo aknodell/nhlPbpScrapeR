@@ -1,3 +1,62 @@
+.manually_added_shift_events <-
+  readr::read_csv(
+    "data/manually_added_shift_events.csv",
+    col_types = readr::cols(
+      .default = readr::col_integer(),
+      venue = readr::col_character()
+    )
+  )
+
+.manually_changed_shift_events <-
+  readr::read_csv(
+    "data/manually_changed_shift_events.csv",
+    col_types = readr::cols(
+      .default = readr::col_integer(),
+      venue = readr::col_character()
+    )
+  )
+
+.manually_add_shift_events <- function(shift_events, g_id) {
+  shift_events |>
+    print() |>
+    dplyr::bind_rows(
+      .manually_added_shift_events |>
+        dplyr::filter(game_id == g_id)
+    ) |>
+    print()
+}
+
+.manually_change_shift_events <- function(shift_events, g_id) {
+  shift_events |>
+    dplyr::left_join(
+      .manually_changed_shift_events |>
+        dplyr::filter(game_id == g_id),
+      by =
+        dplyr::join_by(
+          game_id,
+          venue,
+          sweater_number,
+          game_period,
+          shift_start_time,
+          shift_end_time,
+          duration
+        )
+    ) |>
+    dplyr::mutate(
+      shift_start_time =
+        ifelse(
+          is.na(new_shift_start_time),
+          shift_start_time,
+          new_shift_start_time
+        ),
+      shift_end_time =
+        ifelse(is.na(new_shift_end_time), shift_end_time, new_shift_end_time),
+      duration = ifelse(is.na(new_duration), duration, new_duration)
+    ) |>
+    dplyr::select(-c(new_shift_start_time, new_shift_end_time, new_duration)) |>
+    print()
+}
+
 .manually_clean_shifts <- function(s, g_id) {
   if (g_id == 2021021189) {
     s |>
@@ -4229,6 +4288,7 @@
         )
       )
   } else {
-    s
+    s |>
+      print()
   }
 }

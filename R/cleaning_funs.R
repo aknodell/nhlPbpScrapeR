@@ -1495,10 +1495,10 @@ clean_game_details_all_sources <- function(scrape_results, verbose = F) {
   }
 
   scrape_results$html_results$shifts <-
-    .manually_clean_shifts(
-      scrape_results$html_results$shifts,
-      scrape_results$api_results$meta$game_id
-    ) |>
+    scrape_results$html_results$shifts |>
+    .manually_change_shift_events(scrape_results$api_results$meta$game_id) |>
+    .manually_add_shift_events(scrape_results$api_results$meta$game_id) |>
+    .manually_clean_shifts(scrape_results$api_results$meta$game_id) |>
     .preclean_shifts_from_html_report(scrape_results, verbose)
 
   clean_meta <- .clean_metadata(scrape_results, verbose)
