@@ -210,7 +210,7 @@
           desc,
           function(t, d) {
             if (t %in% c("BLOCK", "MISS", "SHOT", "GOAL")) {
-              if (d |> stringr::str_to_lower() |> stringr::str_detect("failed attempt")) {
+              if (d |> stringr::str_to_lower() |> stringr::str_detect("failed attempt") |> tidyr::replace_na(F)) {
                 "Failed Attempt"
               } else {
                 ret <-
@@ -219,7 +219,7 @@
                   purrr::flatten_chr() |>
                   purrr::pluck(
                     ifelse(
-                      d |> stringr::str_to_lower() |> stringr::str_detect("penalty shot"),
+                      d |> stringr::str_to_lower() |> stringr::str_detect("penalty shot") |> tidyr::replace_na(F),
                       3,
                       2
                     )
@@ -227,7 +227,11 @@
                   stringr::str_to_lower() |>
                   stringr::str_squish()
 
-                if (stringr::str_detect(ret, "((off|def|neu)\\.? zone)|(\\d+\\s*ft\\.)")) {
+                if (length(ret) == 0) {
+                  ret <- NA_character_
+                }
+
+                if (stringr::str_detect(ret, "((off|def|neu)\\.? zone)|(\\d+\\s*ft\\.)") |> tidyr::replace_na(F)) {
                   NA_character_
                 } else {
                   ret |>
@@ -519,26 +523,6 @@
 
   has_shootout <- session != 3 | (session == 3 & round == "0" & series == "0")
 
-  home_def_side_lookup <-
-    api_pbp |>
-    dplyr::filter(
-      (event_team == scrape_results$api_results$meta$home_team_id &
-         zone_code == "D") |
-        (event_team == scrape_results$api_results$meta$away_team_id &
-           zone_code == "O")
-    ) |>
-    dplyr::group_by(game_period) |>
-    dplyr::summarise(coords_x = median(coords_x)) |>
-    dplyr::mutate(
-      home_team_def_zone_imp =
-        dplyr::case_when(
-          sign(coords_x) == -1 ~ "left",
-          sign(coords_x) == 1 ~ "right",
-          T ~ NA_character_
-        )
-    ) |>
-    dplyr::select(-coords_x)
-
   home_team_abb <-
     tibble::tibble(
       event_team =
@@ -553,6 +537,44 @@
         )
     )
 
+  home_def_side_lookup <-
+    api_pbp |>
+    dplyr::select(game_period, event_type, event_reason_2, zone_code, coords_x, event_team) |>
+    dplyr::mutate(
+      team = ifelse(event_team == scrape_results$api_results$meta$home_team_id, "home", "away"),
+      side_switch =
+        dplyr::lag(cumsum(tidyr::replace_na(event_reason_2 == "switch-sides", F))) |>
+        tidyr::replace_na(0),
+      home_team_zone =
+        dplyr::case_when(
+          team == "home" & zone_code == "D" & event_type %in% c(
+            "hit", "faceoff", "giveaway", "takeaway", "penalty"
+          ) ~ "D",
+          team == "away" & zone_code == "O" & event_type %in% c(
+            "hit", "faceoff", "giveaway", "takeaway", "penalty", "shot-on-goal", "goal", "missed-shot"
+          ) ~ "D",
+          team == "away" & zone_code == "D" & event_type == "blocked-shot" ~ "D",
+          team == "away" & zone_code == "D" & event_type %in% c(
+            "hit", "faceoff", "giveaway", "takeaway", "penalty"
+          ) ~ "O",
+          team == "home" & zone_code == "O" & event_type %in% c(
+            "hit", "faceoff", "giveaway", "takeaway", "penalty", "shot-on-goal", "goal", "missed-shot"
+          ) ~ "O",
+          team == "home" & zone_code == "D" & event_type == "blocked-shot" ~ "O",
+          T ~ NA
+        )
+    ) |>
+    dplyr::filter(abs(coords_x) > 25, home_team_zone  %in% c("D", "O")) |>
+    dplyr::group_by(
+      game_period, side_switch
+    ) |>
+    dplyr::summarise(
+      home_team_def_zone =
+        median(coords_x * ifelse(home_team_zone == "O", -1, 1)),
+      home_team_def_zone =
+        ifelse(home_team_def_zone < 0, "left", "right")
+    )
+
   api_pbp |>
     .manually_add_api_events(scrape_results$api_results$meta$game_id) |>
     .manually_change_api_events(scrape_results$api_results$meta$game_id) |>
@@ -561,19 +583,17 @@
       home_team_abb,
       by = dplyr::join_by(event_team)
     ) |>
+    dplyr::mutate(
+      side_switch =
+        dplyr::lag(cumsum(tidyr::replace_na(event_reason_2 == "switch-sides", F))) |>
+        tidyr::replace_na(0)
+    ) |>
+    dplyr::select(-c(home_team_def_zone)) |>
     dplyr::left_join(
       home_def_side_lookup,
-      by = dplyr::join_by(game_period)
+      by = dplyr::join_by(game_period, side_switch)
     ) |>
     dplyr::mutate(
-      home_team_def_zone =
-        purrr::map2_chr(
-          home_team_def_zone,
-          home_team_def_zone_imp,
-          function(x, y) {
-            tidyr::replace_na(x, y)
-          }
-        ),
       next_faceoff_x = ifelse(event_type == "faceoff", coords_x, NA_integer_),
       next_faceoff_team = ifelse(event_type == "faceoff", event_team_api, NA_character_),
       next_faceoff_zone = ifelse(event_type == "faceoff", zone_code, NA_character_)
@@ -670,7 +690,7 @@
         )
     ) |>
     dplyr::select(
-      -c(home_team_def_zone_imp, next_faceoff_x, next_faceoff_team, next_faceoff_zone)
+      -c(side_switch, next_faceoff_x, next_faceoff_team, next_faceoff_zone)
     )
 }
 
@@ -760,7 +780,7 @@
               event_detail_2_html,
               ifelse(event_reason_1 == "Blocked", NA_character_, event_reason_1)
             ),
-          event_type == "PENL" ~ penalty_class,
+          event_type == "PENL" ~ as.character(penalty_class),
           event_type == "STOP" ~
             event_reason_2,
           T ~ NA_character_
@@ -1121,6 +1141,14 @@
       shift_id = ifelse(shift_id < max_shift, max_shift, shift_id)
     ) |>
     tidyr::fill(shift_id, .direction = "downup") |>
+    dplyr::arrange(
+      game_seconds,
+      game_period,
+      shift_id,
+      dplyr::desc(event_type == "CHANGE"),
+      event_sort_order,
+      event_id
+    ) |>
     dplyr::group_by(game_period) |>
     tidyr::fill(home_team_def_zone, .direction = "downup") |>
     dplyr::ungroup() |>
@@ -1174,7 +1202,11 @@
         ),
       event_team = ifelse(event_type == "CHANGE", event_team_html, event_team),
       shift_id = dplyr::dense_rank(shift_id),
-      cumulative_penalty_shots = cumsum(home_skater_strength_state == "Penalty Shot"),
+      cumulative_penalty_shots =
+        cumsum(
+          (home_skater_strength_state == "Penalty Shot") |
+            (tidyr::replace_na(dplyr::lag(home_skater_strength_state), "") == "Penalty Shot")
+        ),
       shift_id =
         shift_id +
         cumulative_penalty_shots,
