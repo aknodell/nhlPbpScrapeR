@@ -858,20 +858,20 @@
             T ~ shift_start_time
           )
       )
-  } else if (g_id == 2015020866) {
-    s |>
-      dplyr::mutate(
-        duration =
-          dplyr::case_when(
-            venue == "home" & sweater_number == 33 & game_period == 2 ~ 1200,
-            T ~ duration
-          ),
-        shift_start_time =
-          dplyr::case_when(
-            venue == "home" & sweater_number == 33 & game_period == 2 ~ 1200,
-            T ~ shift_start_time
-          )
-      )
+  # } else if (g_id == 2015020866) {
+  #   s |>
+  #     dplyr::mutate(
+  #       duration =
+  #         dplyr::case_when(
+  #           venue == "home" & sweater_number == 33 & game_period == 2 ~ 1200,
+  #           T ~ duration
+  #         ),
+  #       shift_start_time =
+  #         dplyr::case_when(
+  #           venue == "home" & sweater_number == 33 & game_period == 2 ~ 1200,
+  #           T ~ shift_start_time
+  #         )
+  #     )
   } else if (g_id == 2015020825) {
     s |>
       dplyr::filter(
