@@ -1492,6 +1492,10 @@
         shift_start_zone,
         shift_end,
         shift_end_zone
+      ) |>
+      dplyr::filter(!is.na(api_id)) |>
+      dplyr::arrange(
+        game_id, team, api_id, game_period, shift_start
       )
   } else {
     tibble::tibble(game_id = integer(0))
