@@ -323,6 +323,45 @@
           )
       )
   }
+  if (g_id == 2009021210) {
+    api_events <-
+      api_events |>
+      dplyr::filter(
+        sort_order != 610,
+        sort_order != 612
+      )
+  }
+  if (g_id == 2009021191) {
+    api_events <-
+      api_events |>
+      dplyr::mutate(
+        event_type =
+          dplyr::case_when(
+            sort_order == 636 ~ "shot-on-goal",
+            sort_order == 638 ~ "shot-on-goal",
+            T ~ event_type
+          )
+      )
+  }
+  if (g_id == 2009021094) {
+    api_events <-
+      api_events |>
+      dplyr::filter(
+        sort_order != 420,
+        sort_order != 421
+      )
+  }
+  if (g_id == 2009021059) {
+    api_events <-
+      api_events |>
+      dplyr::mutate(
+        event_type =
+          dplyr::case_when(
+            sort_order == 712 ~ "missed-shot",
+            T ~ event_type
+          )
+      )
+  }
 
   api_events
 }
